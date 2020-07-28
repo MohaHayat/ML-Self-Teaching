@@ -1,2 +1,2 @@
 # ML-Self-Teaching
-Some ML files I made to learn the basics 
+I made these files while learning from online sources. Each python file is heavily commented.  
