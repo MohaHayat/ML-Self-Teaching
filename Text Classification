@@ -1,0 +1,90 @@
+import tensorflow as tf
+from tensorflow import keras
+import numpy as np
+
+# import movie reviews data
+data = keras.datasets.imdb
+
+# split the data into testing and training data
+# returns integer encoded words, each of the 10k words has an associated integer 0 - 9999
+# changed from 10k o 88k
+(train_data, train_labels), (test_data, test_labels) = data.load_data(num_words=88000)      # 88k most frequent words
+
+# get mappings for words to turn integers to words we can understand
+# typically you would make your own mapping with your won dict of words
+# however, keras has an index for this dataset
+word_index = data.get_word_index()      # returns tuples with strings
+
+# break the tuples up into k and v where k is the key and v is the integer value
+# We have 4 keys that are special chars for word mapping
+# add 3 to each value so 0-3 can be used for the special characters
+word_index = {k: (v+3) for k, v in word_index.items()}           # returns dict of words
+word_index["<PAD>"] = 0                 # make our movie sets the same len; if 100 or 200, add padding to 100 so = 200
+word_index["<START>"] = 1               #
+word_index["<UNK>"] = 2
+word_index["<UNUSED>"] = 3
+
+# swaps values and keys
+# first we had word pointing to the int val but we want int val pointing to the word
+reverse_word_index = dict([(value, key) for (key, value) in word_index.items()])
+
+# We need to know the shape and size of our input and output
+# We need to make the size and shape of data consistent -  use PAD tab
+# if review is greater than 250 words, ignore
+train_data = keras.preprocessing.sequence.pad_sequences(train_data, value=word_index["<PAD>"], padding='post', maxlen=250)
+test_data = keras.preprocessing.sequence.pad_sequences(test_data, value=word_index["<PAD>"], padding='post', maxlen=250)
+
+
+# function that decodes training and testing data to words we can read
+# returns words
+def decode_review(text):
+    return " ".join([reverse_word_index.get(i, "?") for i in text])         # try to get index i and if nothing return ?
+
+
+# Define Model
+model = keras.Sequential()
+model.add(keras.layers.Embedding(88000, 16))
+model.add(keras.layers.GlobalAveragePooling1D())
+model.add(keras.layers.Dense(16, activation="relu"))
+# Want final output to be whether the review is good or the review is bad
+# probability from 0 to 1
+model.add(keras.layers.Dense(1, activation="sigmoid"))          # sigmoid gives a value between 0 and 1
+
+# Summarizes the model. Provides information on the layers, output shape, parameters (weights)
+model.summary()
+
+# train the model
+# look up opt, loss, and metrics functions for better understanding
+# using binary_crossentropy because we only one want a 0 or 1 output
+# the loss function returns how far we were off - if answer is 1 and we get 0.8 - it calculates error
+model.compile(optimizer='adam', loss="binary_crossentropy", metrics=["accuracy"])
+
+# split training data into tests
+# validation data - check how well our model is performing based on the tweaks we make on the training data
+# applied on new data
+x_val = train_data[:10000]              # we have 20+ thousand reviews but we are only choosing 10k
+x_train = train_data[10000:]            # the rest od the data is used as new data
+
+y_val = train_labels[:10000]
+y_train = train_labels[10000:]
+
+# batch_size is how many movie reviews we will load in at once
+# validation_data is the data we defined above
+# verbose determines how much detail to include in the output when training,
+# 0 prints nothing, 2 prints acc and loss for each epoch
+fitModel = model.fit(x_train, y_train, epochs=40, batch_size=512, validation_data=(x_val, y_val), verbose=1)
+
+# score/evaluate model
+results = model.evaluate(test_data, test_labels)
+print(results)
+
+# Save model
+model.save("model.h5")          # h5 is an extension for a saved model in tf and keras, saves as binary data
+
+# predict on a single review
+# test_review = test_data[0]
+# predict = model.predict([test_review])
+# print("Review: ")
+# print(decode_review(test_review))
+# print("Prediction:" + str(predict[0]))
+# print("Actual: " + str(test_labels[0]))
